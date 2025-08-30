@@ -1,0 +1,16 @@
+[package]
+name = "egui_directory_combobox"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "egui_directory_combobox"
+
+[[example]]
+name = "demo"
+
+[dependencies]
+egui = "0.32"
+
+[dev-dependencies]
+eframe = "0.32.1"
