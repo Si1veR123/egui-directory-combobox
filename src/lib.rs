@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use egui::RichText;
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum DirectoryNode {
     File(PathBuf),
     Directory(PathBuf, Vec<DirectoryNode>),
@@ -71,6 +72,7 @@ impl DirectoryNode {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct DirectoryComboBox {
     id: egui::Id,
     selected: Option<PathBuf>,
