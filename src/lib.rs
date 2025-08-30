@@ -29,6 +29,46 @@ impl DirectoryNode {
             DirectoryNode::Directory(p, _) => p,
         }
     }
+
+    pub fn find_parent_directory(&self, path: &Path) -> Option<&DirectoryNode> {
+        match self {
+            DirectoryNode::File(_) => None,
+            DirectoryNode::Directory(dir_path, children) => {
+                if path.starts_with(dir_path) {
+                    for child in children {
+                        if let Some(found) = child.find_parent_directory(path) {
+                            return Some(found);
+                        }
+                    }
+                    return Some(self);
+                }
+                None
+            }
+        }
+    }
+
+    pub fn find_node_of_path(&self, path: &Path) -> Option<&DirectoryNode> {
+        match self {
+            DirectoryNode::File(p) => {
+                if p == path {
+                    Some(self)
+                } else {
+                    None
+                }
+            }
+            DirectoryNode::Directory(dir_path, children) => {
+                if dir_path == path {
+                    return Some(self);
+                }
+                for child in children {
+                    if let Some(found) = child.find_node_of_path(path) {
+                        return Some(found);
+                    }
+                }
+                None
+            }
+        }
+    }
 }
 
 pub struct DirectoryComboBox {
@@ -83,6 +123,69 @@ impl DirectoryComboBox {
     pub fn with_max_size(mut self, max_size: egui::Vec2) -> Self {
         self.max_size = max_size;
         self
+    }
+
+    /// Get the currently selected path, if any.
+    pub fn selected(&self) -> Option<&Path> {
+        self.selected.as_ref().map(|p| p.as_path())
+    }
+
+    fn navigate_folder(&mut self, forward: bool) {
+        if let Some(selected_path) = &self.selected {
+            for root in &self.roots {
+                if let Some(parent) = root.find_parent_directory(&selected_path) {
+                    if let DirectoryNode::Directory(_p, children) = parent {
+                        let mut found_selected = false;
+
+                        let children_iter = if forward {
+                            Box::new(children.iter()) as Box<dyn Iterator<Item = &DirectoryNode>>
+                        } else {
+                            Box::new(children.iter().rev()) as Box<dyn Iterator<Item = &DirectoryNode>>
+                        };
+
+                        for child in children_iter {
+                            if let DirectoryNode::File(file_path) = child {
+                                if file_path == selected_path {
+                                    found_selected = true;
+                                } else if found_selected {
+                                    self.selected = Some(file_path.clone());
+                                    return;
+                                }
+                            }
+                        }
+
+                        if found_selected {
+                            // Wrap around to the start/end of the list
+                            if forward {
+                                for child in children {
+                                    if let DirectoryNode::File(file_path) = child {
+                                        self.selected = Some(file_path.clone());
+                                        return;
+                                    }
+                                }
+                            } else {
+                                for child in children.iter().rev() {
+                                    if let DirectoryNode::File(file_path) = child {
+                                        self.selected = Some(file_path.clone());
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// If a file is selected, select the next file in the parent directory, if one exists.
+    pub fn select_next_file(&mut self) {
+        self.navigate_folder(true);
+    }
+
+    /// If a file is selected, select the previous file in the parent directory, if one exists.
+    pub fn select_previous_file(&mut self) {
+        self.navigate_folder(false);
     }
 }
 
