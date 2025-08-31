@@ -344,7 +344,8 @@ fn nested_combobox_popup_ui(
         egui::PopupAnchor::Position(ui.next_widget_position()),
         egui::LayerId::new(egui::Order::Foreground, id.with("popup_layer"))
     )
-    .close_behavior(egui::PopupCloseBehavior::IgnoreClicks).sense(egui::Sense::click())
+    .close_behavior(egui::PopupCloseBehavior::IgnoreClicks)
+    .sense(egui::Sense::click())
     .layout(egui::Layout::top_down_justified(egui::Align::LEFT))
     .gap(0.0)
     .kind(egui::PopupKind::Menu);
@@ -414,7 +415,11 @@ impl egui::Widget for &mut DirectoryComboBox {
         let popups_clicked = cb_response.clicked() || self.selected_path != old_value;
         // There was a click and no popups were clicked -> close all popups
         if ui.ctx().input(|i| i.pointer.any_click()) && !popups_clicked {
-            egui::Popup::close_all(ui.ctx());
+            // ID of the root popup, a bit hacky
+            let id_salt = egui::Id::new(self.id);
+            let button_id = ui.make_persistent_id(id_salt);
+            let popup_id = button_id.with("popup");
+            egui::Popup::close_id(ui.ctx(), popup_id);
         }
 
         // If select_files_only is true, only set selected_file if a file is selected
