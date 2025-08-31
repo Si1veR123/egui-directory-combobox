@@ -29,7 +29,7 @@ fn main() {
     let path = enter_path();
 
     let app = MyApp {
-        combobox: DirectoryComboBox::new_from_path(path)
+        combobox: DirectoryComboBox::new_from_paths(&[path])
     };
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(

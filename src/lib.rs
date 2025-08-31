@@ -77,12 +77,13 @@ pub struct DirectoryComboBox {
     id: egui::Id,
     selected: Option<PathBuf>,
     roots: Vec<DirectoryNode>,
-    max_size: Option<egui::Vec2>
+    max_size: Option<egui::Vec2>,
+    wrap_mode: Option<egui::TextWrapMode>,
 }
 
 impl Default for DirectoryComboBox {
     fn default() -> Self {
-        Self { selected: None, roots: Vec::new(), id: egui::Id::new("directory_combobox"), max_size: None }
+        Self { selected: None, roots: Vec::new(), id: egui::Id::new("directory_combobox"), max_size: None, wrap_mode: None}
     }
 }
 
@@ -124,6 +125,12 @@ impl DirectoryComboBox {
     /// Change the maximum size of each popup menu.
     pub fn with_max_size(mut self, max_size: egui::Vec2) -> Self {
         self.max_size = Some(max_size);
+        self
+    }
+
+    /// Change the text wrap mode of the combo box.
+    pub fn with_wrap_mode(mut self, wrap_mode: egui::TextWrapMode) -> Self {
+        self.wrap_mode = Some(wrap_mode);
         self
     }
 
@@ -258,11 +265,12 @@ fn nested_combobox_popup_ui(
         ui.ctx().clone(),
         egui::PopupAnchor::Position(ui.next_widget_position()),
         egui::LayerId::new(egui::Order::Foreground, id.with("popup_layer"))
-    ).close_behavior(egui::PopupCloseBehavior::IgnoreClicks);
+    ).close_behavior(egui::PopupCloseBehavior::IgnoreClicks).sense(egui::Sense::click());
 
     if let Some(max_size) = max_size {
         popup = popup.width(max_size.x);
     }
+
     popup.show(|ui| {
         let mut scroll = egui::ScrollArea::vertical();
 
@@ -271,21 +279,26 @@ fn nested_combobox_popup_ui(
         };
         
         scroll.show(ui, |ui| {
-                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-                nested_combobox_ui(ui, nodes, is_root, id, selected, max_size)
-            })
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
+            nested_combobox_ui(ui, nodes, is_root, id, selected, max_size)
+        })
     });
 }
 
 impl egui::Widget for &mut DirectoryComboBox {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        let old_value = self.selected.clone();
         let mut cb = egui::ComboBox::from_id_salt(self.id);
 
         if let Some(max_size) = self.max_size {
             cb = cb.width(max_size.x).height(max_size.y)
         }
 
-        cb.close_behavior(egui::PopupCloseBehavior::IgnoreClicks)
+        if let Some(wrap_mode) = self.wrap_mode {
+            cb = cb.wrap_mode(wrap_mode);
+        }
+
+        let cb_response = cb.close_behavior(egui::PopupCloseBehavior::IgnoreClicks)
             .selected_text(match &self.selected {
                 Some(p) => p.file_name().expect("Selected file name should be a full path").to_string_lossy(),
                 None => "Select".into(),
@@ -299,6 +312,14 @@ impl egui::Widget for &mut DirectoryComboBox {
                     &mut self.selected,
                     self.max_size
                 )
-            }).response
+            }).response;
+
+        let popups_clicked = cb_response.clicked() || self.selected != old_value;
+        // There was a click and no popups were clicked -> close all popups
+        if ui.ctx().input(|i| i.pointer.any_click()) && !popups_clicked {
+            egui::Popup::close_all(ui.ctx());
+        }
+
+        cb_response
     }
 }
