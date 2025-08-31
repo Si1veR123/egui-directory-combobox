@@ -78,7 +78,8 @@ pub struct DirectoryComboBox {
     selected_path: Option<PathBuf>,
     selected_file: Option<PathBuf>,
     pub roots: Vec<DirectoryNode>,
-    pub max_size: Option<egui::Vec2>,
+    pub max_width: Option<f32>,
+    pub max_height: Option<f32>,
     pub wrap_mode: Option<egui::TextWrapMode>,
     pub show_extensions: bool,
     pub filter: Option<Arc<dyn Fn(&Path) -> bool>>,
@@ -92,7 +93,8 @@ impl Default for DirectoryComboBox {
             selected_file: None,
             roots: Vec::new(),
             id: egui::Id::new("directory_combobox"),
-            max_size: None,
+            max_height: None,
+            max_width: None,
             wrap_mode: None,
             show_extensions: true,
             filter: None,
@@ -136,9 +138,15 @@ impl DirectoryComboBox {
         self
     }
 
-    /// Change the maximum size of each popup menu.
-    pub fn with_max_size(mut self, max_size: egui::Vec2) -> Self {
-        self.max_size = Some(max_size);
+    /// Change the maximum height of each popup menu.
+    pub fn with_max_height(mut self, max_height: f32) -> Self {
+        self.max_height = Some(max_height);
+        self
+    }
+
+    /// Change the maximum width of each popup menu.
+    pub fn with_max_width(mut self, max_width: f32) -> Self {
+        self.max_width = Some(max_width);
         self
     }
 
@@ -243,7 +251,8 @@ fn nested_combobox_ui(
     is_root: bool,
     id: egui::Id,
     selected_path: &mut Option<PathBuf>,
-    max_size: Option<egui::Vec2>,
+    max_height: Option<f32>,
+    max_width: Option<f32>,
     show_extensions: bool,
     filter: Option<&Arc<dyn Fn(&Path) -> bool>>,
 ) {
@@ -291,9 +300,10 @@ fn nested_combobox_ui(
                             &mut child_ui,
                             children,
                             false,
-                            id.with("child"),
+                            id.with(dir_path),
                             selected_path,
-                            max_size,
+                            max_height,
+                            max_width,
                             show_extensions,
                             filter,
                         );
@@ -323,7 +333,8 @@ fn nested_combobox_popup_ui(
     is_root: bool,
     id: egui::Id,
     selected_path: &mut Option<PathBuf>,
-    max_size: Option<egui::Vec2>,
+    max_height: Option<f32>,
+    max_width: Option<f32>,
     show_extensions: bool,
     filter: Option<&Arc<dyn Fn(&Path) -> bool>>,
 ) {
@@ -332,21 +343,28 @@ fn nested_combobox_popup_ui(
         ui.ctx().clone(),
         egui::PopupAnchor::Position(ui.next_widget_position()),
         egui::LayerId::new(egui::Order::Foreground, id.with("popup_layer"))
-    ).close_behavior(egui::PopupCloseBehavior::IgnoreClicks).sense(egui::Sense::click());
+    )
+    .close_behavior(egui::PopupCloseBehavior::IgnoreClicks).sense(egui::Sense::click())
+    .layout(egui::Layout::top_down_justified(egui::Align::LEFT))
+    .gap(0.0)
+    .kind(egui::PopupKind::Menu);
 
-    if let Some(max_size) = max_size {
-        popup = popup.width(max_size.x);
+    if let Some(max_width) = max_width {
+        popup = popup.width(max_width);
     }
 
     popup.show(|ui| {
+
         let mut scroll = egui::ScrollArea::vertical();
 
-        if let Some(max_size) = max_size {
-            scroll = scroll.max_height(max_size.y)
+        if let Some(max_height) = max_height {
+            scroll = scroll.max_height(max_height)
         };
         
         scroll.show(ui, |ui| {
-            nested_combobox_ui(ui, nodes, is_root, id, selected_path, max_size, show_extensions, filter);
+            // Make selectable buttons extend the width of the popup
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
+            nested_combobox_ui(ui, nodes, is_root, id, selected_path, max_height, max_width, show_extensions, filter);
         })
     });
 }
@@ -356,8 +374,12 @@ impl egui::Widget for &mut DirectoryComboBox {
         let old_value = self.selected_path.clone();
         let mut cb = egui::ComboBox::from_id_salt(self.id);
 
-        if let Some(max_size) = self.max_size {
-            cb = cb.width(max_size.x).height(max_size.y)
+        if let Some(max_height) = self.max_height {
+            cb = cb.height(max_height);
+        }
+
+        if let Some(max_width) = self.max_width {
+            cb = cb.width(max_width);
         }
 
         if let Some(wrap_mode) = self.wrap_mode {
@@ -382,7 +404,8 @@ impl egui::Widget for &mut DirectoryComboBox {
                     true,
                     self.id.with("child"),
                     &mut self.selected_path,
-                    self.max_size,
+                    self.max_height,
+                    self.max_width,
                     self.show_extensions,
                     self.filter.as_ref(),
                 )
