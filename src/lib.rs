@@ -9,19 +9,25 @@ pub enum DirectoryNode {
 }
 
 impl DirectoryNode {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
+    pub fn try_from_path<P: AsRef<Path>>(path: P) -> Option<Self> {
         let path = path.as_ref().to_path_buf();
         if path.is_dir() {
             let mut children = Vec::new();
             if let Ok(entries) = std::fs::read_dir(&path) {
                 for entry in entries.flatten() {
-                    children.push(DirectoryNode::from_path(entry.path()));
+                    children.push(DirectoryNode::try_from_path(entry.path())?);
                 }
             }
-            DirectoryNode::Directory(path, children)
+            Some(DirectoryNode::Directory(path, children))
+        } else if path.is_file() {
+            Some(DirectoryNode::File(path))
         } else {
-            DirectoryNode::File(path)
+            None
         }
+    }
+
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
+        Self::try_from_path(path).expect("Path should be a valid file or directory")
     }
 
     pub fn path(&self) -> &Path {
