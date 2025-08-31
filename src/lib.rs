@@ -96,7 +96,7 @@ impl Default for DirectoryComboBox {
             wrap_mode: None,
             show_extensions: true,
             filter: None,
-            select_files_only: true,
+            select_files_only: false,
         }
     }
 }
@@ -355,8 +355,14 @@ impl egui::Widget for &mut DirectoryComboBox {
             cb = cb.wrap_mode(wrap_mode);
         }
 
+        let selected_text_path = if self.select_files_only {
+            self.selected_file.as_ref()
+        } else {
+            self.selected_path.as_ref()
+        };
+
         let cb_response = cb.close_behavior(egui::PopupCloseBehavior::IgnoreClicks)
-            .selected_text(match &self.selected_path {
+            .selected_text(match selected_text_path {
                 Some(p) => p.file_name().expect("Selected file name should be a full path").to_string_lossy(),
                 None => "Select".into(),
             })
