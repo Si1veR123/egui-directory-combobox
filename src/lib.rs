@@ -75,24 +75,28 @@ impl DirectoryNode {
 #[derive(Clone)]
 pub struct DirectoryComboBox {
     id: egui::Id,
-    selected: Option<PathBuf>,
-    roots: Vec<DirectoryNode>,
-    max_size: Option<egui::Vec2>,
-    wrap_mode: Option<egui::TextWrapMode>,
-    show_extensions: bool,
-    filter: Option<Arc<Box<dyn Fn(&Path) -> bool>>>,
+    selected_path: Option<PathBuf>,
+    selected_file: Option<PathBuf>,
+    pub roots: Vec<DirectoryNode>,
+    pub max_size: Option<egui::Vec2>,
+    pub wrap_mode: Option<egui::TextWrapMode>,
+    pub show_extensions: bool,
+    pub filter: Option<Arc<dyn Fn(&Path) -> bool>>,
+    pub select_files_only: bool
 }
 
 impl Default for DirectoryComboBox {
     fn default() -> Self {
         Self {
-            selected: None,
+            selected_path: None,
+            selected_file: None,
             roots: Vec::new(),
             id: egui::Id::new("directory_combobox"),
             max_size: None,
             wrap_mode: None,
             show_extensions: true,
             filter: None,
+            select_files_only: true,
         }
     }
 }
@@ -145,8 +149,14 @@ impl DirectoryComboBox {
     }
 
     /// Set a filter function to determine which files are shown.
-    pub fn with_filter(mut self, filter: Box<dyn Fn(&Path) -> bool>) -> Self {
-        self.filter = Some(Arc::new(filter));
+    pub fn with_filter(mut self, filter: Arc<dyn Fn(&Path) -> bool>) -> Self {
+        self.filter = Some(filter);
+        self
+    }
+
+    /// If true, only files can be selected. If false, directories can also be selected.
+    pub fn select_files_only(mut self, select_files_only: bool) -> Self {
+        self.select_files_only = select_files_only;
         self
     }
 
@@ -156,15 +166,20 @@ impl DirectoryComboBox {
         self
     }
 
-
-
-    /// Get the currently selected path, if any.
+    /// If `select_files_only` is true, this will return the last selected file, if any.
+    /// 
+    /// If `select_files_only` is false, this will return the selected path, if any.
     pub fn selected(&self) -> Option<&Path> {
-        self.selected.as_ref().map(|p| p.as_path())
+        self.selected_file.as_ref().map(|p| p.as_path())
+    }
+
+    /// This will always return the selected path. If `select_files_only` is false, this will be the same as `selected()`.
+    pub fn selected_path(&self) -> Option<&Path> {
+        self.selected_path.as_ref().map(|p| p.as_path())
     }
 
     fn navigate_folder(&mut self, forward: bool) {
-        if let Some(selected_path) = &self.selected {
+        if let Some(selected_path) = &self.selected_path {
             for root in &self.roots {
                 if let Some(parent) = root.find_parent_directory(&selected_path) {
                     if let DirectoryNode::Directory(_p, children) = parent {
@@ -181,7 +196,7 @@ impl DirectoryComboBox {
                                 if file_path == selected_path {
                                     found_selected = true;
                                 } else if found_selected {
-                                    self.selected = Some(file_path.clone());
+                                    self.selected_path = Some(file_path.clone());
                                     return;
                                 }
                             }
@@ -192,14 +207,14 @@ impl DirectoryComboBox {
                             if forward {
                                 for child in children {
                                     if let DirectoryNode::File(file_path) = child {
-                                        self.selected = Some(file_path.clone());
+                                        self.selected_path = Some(file_path.clone());
                                         return;
                                     }
                                 }
                             } else {
                                 for child in children.iter().rev() {
                                     if let DirectoryNode::File(file_path) = child {
-                                        self.selected = Some(file_path.clone());
+                                        self.selected_path = Some(file_path.clone());
                                         return;
                                     }
                                 }
@@ -227,13 +242,13 @@ fn nested_combobox_ui(
     nodes: &[DirectoryNode],
     is_root: bool,
     id: egui::Id,
-    selected: &mut Option<PathBuf>,
+    selected_path: &mut Option<PathBuf>,
     max_size: Option<egui::Vec2>,
     show_extensions: bool,
-    filter: Option<&Arc<Box<dyn Fn(&Path) -> bool>>>,
+    filter: Option<&Arc<dyn Fn(&Path) -> bool>>,
 ) {
     if is_root {
-        ui.selectable_value(selected, None, "None");
+        ui.selectable_value(selected_path, None, "None");
     }
     for node in nodes {
         match node {
@@ -252,13 +267,13 @@ fn nested_combobox_ui(
                     file_name_str = &file_name_str[..file_name_str.len() - extension.len() - 1];
                 }
 
-                if ui.selectable_value(selected, Some(p.clone()), file_name_str).clicked() {
+                if ui.selectable_value(selected_path, Some(p.clone()), file_name_str).clicked() {
                     egui::Popup::close_all(ui.ctx());
                 };
             }
             DirectoryNode::Directory(dir_path, children) => {
-                if let Some(selected_path) = selected {
-                    if selected_path.starts_with(dir_path) {
+                if let Some(selected_path_unwrap) = selected_path {
+                    if selected_path_unwrap.starts_with(dir_path) {
                         // This directory needs its own combo box as it is
                         // selected or an ancestor of the selected item
                         
@@ -273,7 +288,7 @@ fn nested_combobox_ui(
                             children,
                             false,
                             id.with("child"),
-                            selected,
+                            selected_path,
                             max_size,
                             show_extensions,
                             filter,
@@ -282,7 +297,7 @@ fn nested_combobox_ui(
                 }
 
                 ui.selectable_value(
-                    selected,
+                    selected_path,
                     Some(dir_path.clone()),
                     RichText::new(
                         dir_path.file_name().expect("Directory name should be a full path").to_string_lossy()
@@ -298,10 +313,10 @@ fn nested_combobox_popup_ui(
     nodes: &[DirectoryNode],
     is_root: bool,
     id: egui::Id,
-    selected: &mut Option<PathBuf>,
+    selected_path: &mut Option<PathBuf>,
     max_size: Option<egui::Vec2>,
     show_extensions: bool,
-    filter: Option<&Arc<Box<dyn Fn(&Path) -> bool>>>,
+    filter: Option<&Arc<dyn Fn(&Path) -> bool>>,
 ) {
     let mut popup = egui::Popup::new(
         id,
@@ -322,15 +337,14 @@ fn nested_combobox_popup_ui(
         };
         
         scroll.show(ui, |ui| {
-            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-            nested_combobox_ui(ui, nodes, is_root, id, selected, max_size, show_extensions, filter);
+            nested_combobox_ui(ui, nodes, is_root, id, selected_path, max_size, show_extensions, filter);
         })
     });
 }
 
 impl egui::Widget for &mut DirectoryComboBox {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let old_value = self.selected.clone();
+        let old_value = self.selected_path.clone();
         let mut cb = egui::ComboBox::from_id_salt(self.id);
 
         if let Some(max_size) = self.max_size {
@@ -342,7 +356,7 @@ impl egui::Widget for &mut DirectoryComboBox {
         }
 
         let cb_response = cb.close_behavior(egui::PopupCloseBehavior::IgnoreClicks)
-            .selected_text(match &self.selected {
+            .selected_text(match &self.selected_path {
                 Some(p) => p.file_name().expect("Selected file name should be a full path").to_string_lossy(),
                 None => "Select".into(),
             })
@@ -352,17 +366,33 @@ impl egui::Widget for &mut DirectoryComboBox {
                     &self.roots,
                     true,
                     self.id.with("child"),
-                    &mut self.selected,
+                    &mut self.selected_path,
                     self.max_size,
                     self.show_extensions,
                     self.filter.as_ref(),
                 )
             }).response;
 
-        let popups_clicked = cb_response.clicked() || self.selected != old_value;
+        let popups_clicked = cb_response.clicked() || self.selected_path != old_value;
         // There was a click and no popups were clicked -> close all popups
         if ui.ctx().input(|i| i.pointer.any_click()) && !popups_clicked {
             egui::Popup::close_all(ui.ctx());
+        }
+
+        // If select_files_only is true, only set selected_file if a file is selected
+        // Else, set selected_file to the selected_path
+        if self.selected_path != old_value {
+            if self.select_files_only {
+                if let Some(selected_path) = &self.selected_path {
+                    if selected_path.is_file() {
+                        self.selected_file = Some(selected_path.clone());
+                    }
+                } else {
+                    self.selected_file = None;
+                }
+            } else {
+                self.selected_file = self.selected_path.clone();
+            }
         }
 
         cb_response
