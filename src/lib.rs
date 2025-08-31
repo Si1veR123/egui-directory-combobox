@@ -251,10 +251,7 @@ fn nested_combobox_ui(
         ui.selectable_value(selected_path, None, "None");
     }
 
-    if nodes.is_empty() {
-        ui.label("Empty");
-        return;
-    }
+    let mut file_shown = false;
 
     for node in nodes {
         match node {
@@ -273,6 +270,7 @@ fn nested_combobox_ui(
                     file_name_str = &file_name_str[..file_name_str.len() - extension.len() - 1];
                 }
 
+                file_shown = true;
                 if ui.selectable_value(selected_path, Some(p.clone()), file_name_str).clicked() {
                     egui::Popup::close_all(ui.ctx());
                 };
@@ -302,6 +300,7 @@ fn nested_combobox_ui(
                     }
                 }
 
+                file_shown = true;
                 ui.selectable_value(
                     selected_path,
                     Some(dir_path.clone()),
@@ -311,6 +310,10 @@ fn nested_combobox_ui(
                 );
             }
         }
+    }
+
+    if !file_shown {
+        ui.label("Empty");
     }
 }
 
