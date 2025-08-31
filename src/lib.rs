@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, sync::Arc};
 
 use egui::RichText;
 
@@ -72,18 +72,28 @@ impl DirectoryNode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DirectoryComboBox {
     id: egui::Id,
     selected: Option<PathBuf>,
     roots: Vec<DirectoryNode>,
     max_size: Option<egui::Vec2>,
     wrap_mode: Option<egui::TextWrapMode>,
+    show_extensions: bool,
+    filter: Option<Arc<Box<dyn Fn(&Path) -> bool>>>,
 }
 
 impl Default for DirectoryComboBox {
     fn default() -> Self {
-        Self { selected: None, roots: Vec::new(), id: egui::Id::new("directory_combobox"), max_size: None, wrap_mode: None}
+        Self {
+            selected: None,
+            roots: Vec::new(),
+            id: egui::Id::new("directory_combobox"),
+            max_size: None,
+            wrap_mode: None,
+            show_extensions: true,
+            filter: None,
+        }
     }
 }
 
@@ -133,6 +143,20 @@ impl DirectoryComboBox {
         self.wrap_mode = Some(wrap_mode);
         self
     }
+
+    /// Set a filter function to determine which files are shown.
+    pub fn with_filter(mut self, filter: Box<dyn Fn(&Path) -> bool>) -> Self {
+        self.filter = Some(Arc::new(filter));
+        self
+    }
+
+    /// Whether to show file extensions in the combo box.
+    pub fn show_extensions(mut self, show: bool) -> Self {
+        self.show_extensions = show;
+        self
+    }
+
+
 
     /// Get the currently selected path, if any.
     pub fn selected(&self) -> Option<&Path> {
@@ -204,7 +228,9 @@ fn nested_combobox_ui(
     is_root: bool,
     id: egui::Id,
     selected: &mut Option<PathBuf>,
-    max_size: Option<egui::Vec2>
+    max_size: Option<egui::Vec2>,
+    show_extensions: bool,
+    filter: Option<&Arc<Box<dyn Fn(&Path) -> bool>>>,
 ) {
     if is_root {
         ui.selectable_value(selected, None, "None");
@@ -213,7 +239,20 @@ fn nested_combobox_ui(
         match node {
             DirectoryNode::File(p) => {
                 let file_name = p.file_name().expect("File name should be a full path").to_string_lossy();
-                if ui.selectable_value(selected, Some(p.clone()), file_name).clicked() {
+
+                if let Some(filter) = filter {
+                    if !filter(p) {
+                        continue;
+                    }
+                }
+
+                let extension = p.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+                let mut file_name_str = file_name.as_ref();
+                if file_name.ends_with(extension) && !show_extensions {
+                    file_name_str = &file_name_str[..file_name_str.len() - extension.len() - 1];
+                }
+
+                if ui.selectable_value(selected, Some(p.clone()), file_name_str).clicked() {
                     egui::Popup::close_all(ui.ctx());
                 };
             }
@@ -235,7 +274,9 @@ fn nested_combobox_ui(
                             false,
                             id.with("child"),
                             selected,
-                            max_size
+                            max_size,
+                            show_extensions,
+                            filter,
                         );
                     }
                 }
@@ -258,7 +299,9 @@ fn nested_combobox_popup_ui(
     is_root: bool,
     id: egui::Id,
     selected: &mut Option<PathBuf>,
-    max_size: Option<egui::Vec2>
+    max_size: Option<egui::Vec2>,
+    show_extensions: bool,
+    filter: Option<&Arc<Box<dyn Fn(&Path) -> bool>>>,
 ) {
     let mut popup = egui::Popup::new(
         id,
@@ -280,7 +323,7 @@ fn nested_combobox_popup_ui(
         
         scroll.show(ui, |ui| {
             ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-            nested_combobox_ui(ui, nodes, is_root, id, selected, max_size)
+            nested_combobox_ui(ui, nodes, is_root, id, selected, max_size, show_extensions, filter);
         })
     });
 }
@@ -310,7 +353,9 @@ impl egui::Widget for &mut DirectoryComboBox {
                     true,
                     self.id.with("child"),
                     &mut self.selected,
-                    self.max_size
+                    self.max_size,
+                    self.show_extensions,
+                    self.filter.as_ref(),
                 )
             }).response;
 
