@@ -250,6 +250,12 @@ fn nested_combobox_ui(
     if is_root {
         ui.selectable_value(selected_path, None, "None");
     }
+
+    if nodes.is_empty() {
+        ui.label("Empty");
+        return;
+    }
+
     for node in nodes {
         match node {
             DirectoryNode::File(p) => {
