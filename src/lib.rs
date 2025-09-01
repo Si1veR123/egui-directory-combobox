@@ -204,55 +204,86 @@ impl DirectoryComboBox {
         self
     }
 
+    fn navigate_nodes(
+        nodes: &[DirectoryNode],
+        forward: bool,
+        filter: Option<&Arc<dyn Fn(&Path) -> bool>>,
+        selected_path: &mut Option<PathBuf>,
+        selected_file: &mut Option<PathBuf>,
+    ) {
+        if let Some(selected_file_unwrap) = &selected_file {
+            let children_iter = if forward {
+                Box::new(nodes.iter()) as Box<dyn Iterator<Item = &DirectoryNode>>
+            } else {
+                Box::new(nodes.iter().rev()) as Box<dyn Iterator<Item = &DirectoryNode>>
+            };
+
+            let mut found_selected = false;
+            for child in children_iter {
+                if let DirectoryNode::File(file_path) = child {
+                    if file_path == selected_file_unwrap {
+                        found_selected = true;
+                    } else if found_selected && filter.as_ref().map_or(true, |f| f(file_path)) {
+                        *selected_path = Some(file_path.clone());
+                        *selected_file = Some(file_path.clone());
+                        return;
+                    }
+                }
+            }
+            if found_selected {
+                // Wrap around to the start/end of the list
+                if forward {
+                    for child in nodes {
+                        if let DirectoryNode::File(file_path) = child {
+                            if filter.as_ref().map_or(true, |f| f(file_path)) {
+                                *selected_path = Some(file_path.clone());
+                                *selected_file = Some(file_path.clone());
+                            }
+                            return;
+                        }
+                    }
+                } else {
+                    for child in nodes.iter().rev() {
+                        if let DirectoryNode::File(file_path) = child {
+                            if filter.as_ref().map_or(true, |f| f(file_path)) {
+                                *selected_path = Some(file_path.clone());
+                                *selected_file = Some(file_path.clone());
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn navigate_folder(&mut self, forward: bool) {
-        if let Some(selected_path) = &self.selected_path {
+        if let Some(selected_file) = &self.selected_file {
             for root in &self.roots {
-                if let Some(parent) = root.find_parent_directory(&selected_path) {
+                if root.path() == selected_file {
+                    // Selected file is a root
+                    Self::navigate_nodes(
+                        &self.roots,
+                        forward,
+                        self.filter.as_ref(),
+                        &mut self.selected_path,
+                        &mut self.selected_file
+                    );
+                    return;
+                }
+            }
+            
+            for root in &self.roots {
+                if let Some(parent) = root.find_parent_directory(&selected_file) {
                     if let DirectoryNode::Directory(_p, children) = parent {
-                        let mut found_selected = false;
-
-                        let children_iter = if forward {
-                            Box::new(children.iter()) as Box<dyn Iterator<Item = &DirectoryNode>>
-                        } else {
-                            Box::new(children.iter().rev()) as Box<dyn Iterator<Item = &DirectoryNode>>
-                        };
-
-                        for child in children_iter {
-                            if let DirectoryNode::File(file_path) = child {
-                                if file_path == selected_path {
-                                    found_selected = true;
-                                } else if found_selected && self.filter.as_ref().map_or(true, |f| f(file_path)) {
-                                    self.selected_path = Some(file_path.clone());
-                                    self.selected_file = Some(file_path.clone());
-                                    return;
-                                }
-                            }
-                        }
-
-                        if found_selected {
-                            // Wrap around to the start/end of the list
-                            if forward {
-                                for child in children {
-                                    if let DirectoryNode::File(file_path) = child {
-                                        if self.filter.as_ref().map_or(true, |f| f(file_path)) {
-                                            self.selected_path = Some(file_path.clone());
-                                            self.selected_file = Some(file_path.clone());
-                                        }
-                                        return;
-                                    }
-                                }
-                            } else {
-                                for child in children.iter().rev() {
-                                    if let DirectoryNode::File(file_path) = child {
-                                        if self.filter.as_ref().map_or(true, |f| f(file_path)) {
-                                            self.selected_path = Some(file_path.clone());
-                                            self.selected_file = Some(file_path.clone());
-                                        }
-                                        return;
-                                    }
-                                }
-                            }
-                        }
+                        Self::navigate_nodes(
+                            children,
+                            forward,
+                            self.filter.as_ref(),
+                            &mut self.selected_path,
+                            &mut self.selected_file,
+                        );
+                        return;
                     }
                 }
             }
