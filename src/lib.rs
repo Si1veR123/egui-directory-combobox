@@ -249,6 +249,40 @@ impl DirectoryComboBox {
     pub fn select_previous_file(&mut self) {
         self.navigate_folder(false);
     }
+
+    /// Try to set the selected path to `path`. If `path` is not found in the roots, this will return false and not change the selection.
+    /// 
+    /// Setting `path` to `None` will clear the selection and always return true.
+    pub fn try_set_selection<P: AsRef<Path>>(&mut self, path: Option<P>) -> bool {
+        match path {
+            Some(p) => {
+                let p = p.as_ref();
+                for root in &self.roots {
+                    if let Some(node) = root.find_node_of_path(p) {
+                        if self.select_files_only {
+                            if let DirectoryNode::File(_) = node {
+                                self.selected_path = Some(p.to_path_buf());
+                                self.selected_file = Some(p.to_path_buf());
+                                return true;
+                            } else {
+                                return false;
+                            }
+                        } else {
+                            self.selected_path = Some(p.to_path_buf());
+                            self.selected_file = Some(p.to_path_buf());
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            None => {
+                self.selected_path = None;
+                self.selected_file = None;
+                true
+            }
+        }
+    }
 }
 
 fn nested_combobox_ui(
