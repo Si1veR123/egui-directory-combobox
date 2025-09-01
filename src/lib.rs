@@ -250,7 +250,9 @@ impl DirectoryComboBox {
         self.navigate_folder(false);
     }
 
-    /// Set the selected path to `path`. If `select_files_only` is true, `path` must be a file.
+    /// Set the selected path to `path`.
+    /// 
+    /// If `select_files_only` is true, `path` must be a file.
     /// 
     /// Setting `path` to `None` will clear the selection.
     pub fn set_selection<P: AsRef<Path>>(&mut self, path: Option<P>) {
@@ -267,7 +269,6 @@ impl DirectoryComboBox {
                     self.selected_file = Some(p.to_path_buf());
                 } else if p.is_dir() {
                     self.selected_path = Some(p.to_path_buf());
-                    self.selected_file = None;
                 }
             }
             None => {
