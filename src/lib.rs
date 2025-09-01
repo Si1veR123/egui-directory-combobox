@@ -1,6 +1,7 @@
 use std::{path::{Path, PathBuf}, sync::Arc};
 
 use egui::RichText;
+use dunce::canonicalize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DirectoryNode {
@@ -10,7 +11,7 @@ pub enum DirectoryNode {
 
 impl DirectoryNode {
     pub fn try_from_path<P: AsRef<Path>>(path: P) -> Option<Self> {
-        let path = path.as_ref().to_path_buf();
+        let path = canonicalize(path.as_ref()).ok()?;
         if path.is_dir() {
             let mut children = Vec::new();
             if let Ok(entries) = std::fs::read_dir(&path) {
@@ -265,17 +266,20 @@ impl DirectoryComboBox {
     pub fn set_selection<P: AsRef<Path>>(&mut self, path: Option<P>) {
         match path {
             Some(p) => {
-                let p = p.as_ref();
+                let p = match canonicalize(p.as_ref()).ok() {
+                    Some(p) => p,
+                    None => return,
+                };
                 if self.select_files_only {
                     if p.is_file() {
-                        self.selected_path = Some(p.to_path_buf());
-                        self.selected_file = Some(p.to_path_buf());
+                        self.selected_path = Some(p.clone());
+                        self.selected_file = Some(p);
                     }
                 } else if p.is_file() {
-                    self.selected_path = Some(p.to_path_buf());
-                    self.selected_file = Some(p.to_path_buf());
+                    self.selected_path = Some(p.clone());
+                    self.selected_file = Some(p);
                 } else if p.is_dir() {
-                    self.selected_path = Some(p.to_path_buf());
+                    self.selected_path = Some(p);
                 }
             }
             None => {

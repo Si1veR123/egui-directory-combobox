@@ -11,6 +11,7 @@ name = "demo"
 
 [dependencies]
 egui = "0.32"
+dunce = "1.0.5"
 
 [dev-dependencies]
 eframe = "0.32.1"
