@@ -11,7 +11,13 @@ pub struct MyApp {
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         CentralPanel::default().show(ctx, |ui| {
-            self.combobox.ui(ui)
+            self.combobox.ui(ui);
+            if ui.button("Previous File").clicked() {
+                self.combobox.select_previous_file();
+            }
+            if ui.button("Next File").clicked() {
+                self.combobox.select_next_file();
+            }
         });
     }
 }

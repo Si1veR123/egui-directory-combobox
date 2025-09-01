@@ -209,8 +209,9 @@ impl DirectoryComboBox {
                             if let DirectoryNode::File(file_path) = child {
                                 if file_path == selected_path {
                                     found_selected = true;
-                                } else if found_selected {
+                                } else if found_selected && self.filter.as_ref().map_or(true, |f| f(file_path)) {
                                     self.selected_path = Some(file_path.clone());
+                                    self.selected_file = Some(file_path.clone());
                                     return;
                                 }
                             }
@@ -221,14 +222,20 @@ impl DirectoryComboBox {
                             if forward {
                                 for child in children {
                                     if let DirectoryNode::File(file_path) = child {
-                                        self.selected_path = Some(file_path.clone());
+                                        if self.filter.as_ref().map_or(true, |f| f(file_path)) {
+                                            self.selected_path = Some(file_path.clone());
+                                            self.selected_file = Some(file_path.clone());
+                                        }
                                         return;
                                     }
                                 }
                             } else {
                                 for child in children.iter().rev() {
                                     if let DirectoryNode::File(file_path) = child {
-                                        self.selected_path = Some(file_path.clone());
+                                        if self.filter.as_ref().map_or(true, |f| f(file_path)) {
+                                            self.selected_path = Some(file_path.clone());
+                                            self.selected_file = Some(file_path.clone());
+                                        }
                                         return;
                                     }
                                 }
