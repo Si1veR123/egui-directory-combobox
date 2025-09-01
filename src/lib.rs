@@ -16,7 +16,10 @@ impl DirectoryNode {
             let mut children = Vec::new();
             if let Ok(entries) = std::fs::read_dir(&path) {
                 for entry in entries.flatten() {
-                    children.push(DirectoryNode::try_from_path(entry.path())?);
+                    // entry should start with path, else it is probably a symlink which we ignore
+                    if entry.path().starts_with(&path) {
+                        children.push(DirectoryNode::try_from_path(entry.path())?);
+                    }
                 }
             }
             Some(DirectoryNode::Directory(path, children))
