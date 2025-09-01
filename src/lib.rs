@@ -93,7 +93,8 @@ pub struct DirectoryComboBox {
     pub wrap_mode: Option<egui::TextWrapMode>,
     pub show_extensions: bool,
     pub filter: Option<Arc<dyn Fn(&Path) -> bool>>,
-    pub select_files_only: bool
+    pub select_files_only: bool,
+    pub back_button: bool
 }
 
 impl Default for DirectoryComboBox {
@@ -109,6 +110,7 @@ impl Default for DirectoryComboBox {
             show_extensions: true,
             filter: None,
             select_files_only: false,
+            back_button: true
         }
     }
 }
@@ -172,13 +174,13 @@ impl DirectoryComboBox {
         self
     }
 
-    /// If true, only files can be selected. If false, directories can also be selected.
+    /// If true, only files can be selected. If false, directories can also be selected, default: false
     pub fn select_files_only(mut self, select_files_only: bool) -> Self {
         self.select_files_only = select_files_only;
         self
     }
 
-    /// Whether to show file extensions in the combo box.
+    /// Whether to show file extensions in the combo box, default: true
     pub fn show_extensions(mut self, show: bool) -> Self {
         self.show_extensions = show;
         self
@@ -194,6 +196,12 @@ impl DirectoryComboBox {
     /// This will always return the selected path. If `select_files_only` is false, this will be the same as `selected()`.
     pub fn selected_path(&self) -> Option<&Path> {
         self.selected_path.as_ref().map(|p| p.as_path())
+    }
+
+    /// Add a bacl button to the popup menus to go to the previous directory, default: true
+    pub fn with_back_button(mut self, back_button: bool) -> Self {
+        self.back_button = back_button;
+        self
     }
 
     fn navigate_folder(&mut self, forward: bool) {
@@ -303,9 +311,18 @@ fn nested_combobox_ui(
     max_width: Option<f32>,
     show_extensions: bool,
     filter: Option<&Arc<dyn Fn(&Path) -> bool>>,
+    back_button: bool,
 ) {
     if is_root {
         ui.selectable_value(selected_path, None, "None");
+    } else if back_button {
+        if ui.button(RichText::new("Back").underline()).clicked() {
+            if let Some(selected_path_unwrap) = selected_path {
+                *selected_path = selected_path_unwrap.parent().map(|p| p.to_path_buf());
+            } else {
+                *selected_path = None;
+            }
+        }
     }
 
     let mut file_shown = false;
@@ -355,6 +372,7 @@ fn nested_combobox_ui(
                             max_width,
                             show_extensions,
                             filter,
+                            back_button
                         );
                     }
                 }
@@ -386,6 +404,7 @@ fn nested_combobox_popup_ui(
     max_width: Option<f32>,
     show_extensions: bool,
     filter: Option<&Arc<dyn Fn(&Path) -> bool>>,
+    back_button: bool,
 ) {
     let mut popup = egui::Popup::new(
         id,
@@ -414,7 +433,7 @@ fn nested_combobox_popup_ui(
         scroll.show(ui, |ui| {
             // Make selectable buttons extend the width of the popup
             ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-            nested_combobox_ui(ui, nodes, is_root, id, selected_path, max_height, max_width, show_extensions, filter);
+            nested_combobox_ui(ui, nodes, is_root, id, selected_path, max_height, max_width, show_extensions, filter, back_button);
         })
     });
 }
@@ -458,6 +477,7 @@ impl egui::Widget for &mut DirectoryComboBox {
                     self.max_width,
                     self.show_extensions,
                     self.filter.as_ref(),
+                    self.back_button
                 )
             }).response;
 
