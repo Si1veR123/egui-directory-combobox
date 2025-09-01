@@ -188,12 +188,12 @@ impl DirectoryComboBox {
 
     /// If `select_files_only` is true, this will return the last selected file, if any.
     /// 
-    /// If `select_files_only` is false, this will return the selected path, if any.
+    /// If `select_files_only` is false, this will return the selected path (file or dir), if any.
     pub fn selected(&self) -> Option<&Path> {
         self.selected_file.as_ref().map(|p| p.as_path())
     }
 
-    /// This will always return the selected path. If `select_files_only` is false, this will be the same as `selected()`.
+    /// This will always return the selected path, used to display the open popups.
     pub fn selected_path(&self) -> Option<&Path> {
         self.selected_path.as_ref().map(|p| p.as_path())
     }
@@ -335,7 +335,7 @@ impl DirectoryComboBox {
 fn nested_combobox_ui(
     ui: &mut egui::Ui,
     nodes: &[DirectoryNode],
-    is_root: bool,
+    depth: usize,
     id: egui::Id,
     selected_path: &mut Option<PathBuf>,
     max_height: Option<f32>,
@@ -344,12 +344,22 @@ fn nested_combobox_ui(
     filter: Option<&Arc<dyn Fn(&Path) -> bool>>,
     back_button: bool,
 ) {
-    if is_root {
+    if depth == 0 {
         ui.selectable_value(selected_path, None, "None");
     } else if back_button {
         if ui.button(RichText::new("Back").underline()).clicked() {
             if let Some(selected_path_unwrap) = selected_path {
-                *selected_path = selected_path_unwrap.parent().map(|p| p.to_path_buf());
+                if depth == 1 {
+                    // Go to root
+                    *selected_path = None;
+                } else {
+                    if selected_path_unwrap.is_dir() {
+                        *selected_path = selected_path_unwrap.parent().map(|p| p.to_path_buf());
+                    } else if selected_path_unwrap.is_file() {
+                        // Go up two levels
+                        *selected_path = selected_path_unwrap.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf());
+                    }
+                }
             } else {
                 *selected_path = None;
             }
@@ -396,7 +406,7 @@ fn nested_combobox_ui(
                         nested_combobox_popup_ui(
                             &mut child_ui,
                             children,
-                            false,
+                            depth+1,
                             id.with(dir_path),
                             selected_path,
                             max_height,
@@ -428,7 +438,7 @@ fn nested_combobox_ui(
 fn nested_combobox_popup_ui(
     ui: &mut egui::Ui,
     nodes: &[DirectoryNode],
-    is_root: bool,
+    depth: usize,
     id: egui::Id,
     selected_path: &mut Option<PathBuf>,
     max_height: Option<f32>,
@@ -464,7 +474,7 @@ fn nested_combobox_popup_ui(
         scroll.show(ui, |ui| {
             // Make selectable buttons extend the width of the popup
             ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-            nested_combobox_ui(ui, nodes, is_root, id, selected_path, max_height, max_width, show_extensions, filter, back_button);
+            nested_combobox_ui(ui, nodes, depth, id, selected_path, max_height, max_width, show_extensions, filter, back_button);
         })
     });
 }
@@ -501,7 +511,7 @@ impl egui::Widget for &mut DirectoryComboBox {
                 nested_combobox_ui(
                     ui,
                     &self.roots,
-                    true,
+                    0,
                     self.id.with("child"),
                     &mut self.selected_path,
                     self.max_height,

@@ -35,7 +35,7 @@ fn main() {
     let path = enter_path();
 
     let app = MyApp {
-        combobox: DirectoryComboBox::new_from_paths(&[path])
+        combobox: DirectoryComboBox::new_from_paths(&[path]).select_files_only(true)
     };
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
