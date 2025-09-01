@@ -250,36 +250,29 @@ impl DirectoryComboBox {
         self.navigate_folder(false);
     }
 
-    /// Try to set the selected path to `path`. If `path` is not found in the roots, this will return false and not change the selection.
+    /// Set the selected path to `path`. If `select_files_only` is true, `path` must be a file.
     /// 
-    /// Setting `path` to `None` will clear the selection and always return true.
-    pub fn try_set_selection<P: AsRef<Path>>(&mut self, path: Option<P>) -> bool {
+    /// Setting `path` to `None` will clear the selection.
+    pub fn set_selection<P: AsRef<Path>>(&mut self, path: Option<P>) {
         match path {
             Some(p) => {
                 let p = p.as_ref();
-                for root in &self.roots {
-                    if let Some(node) = root.find_node_of_path(p) {
-                        if self.select_files_only {
-                            if let DirectoryNode::File(_) = node {
-                                self.selected_path = Some(p.to_path_buf());
-                                self.selected_file = Some(p.to_path_buf());
-                                return true;
-                            } else {
-                                return false;
-                            }
-                        } else {
-                            self.selected_path = Some(p.to_path_buf());
-                            self.selected_file = Some(p.to_path_buf());
-                            return true;
-                        }
+                if self.select_files_only {
+                    if p.is_file() {
+                        self.selected_path = Some(p.to_path_buf());
+                        self.selected_file = Some(p.to_path_buf());
                     }
+                } else if p.is_file() {
+                    self.selected_path = Some(p.to_path_buf());
+                    self.selected_file = Some(p.to_path_buf());
+                } else if p.is_dir() {
+                    self.selected_path = Some(p.to_path_buf());
+                    self.selected_file = None;
                 }
-                false
             }
             None => {
                 self.selected_path = None;
                 self.selected_file = None;
-                true
             }
         }
     }
@@ -321,6 +314,7 @@ fn nested_combobox_ui(
 
                 file_shown = true;
                 if ui.selectable_value(selected_path, Some(p.clone()), file_name_str).clicked() {
+                    // TODO: dont close all popups
                     egui::Popup::close_all(ui.ctx());
                 };
             }
