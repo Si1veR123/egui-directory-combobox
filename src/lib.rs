@@ -84,7 +84,7 @@ impl DirectoryNode {
 
 #[derive(Clone)]
 pub struct DirectoryComboBox {
-    id: egui::Id,
+    pub id: egui::Id,
     selected_path: Option<PathBuf>,
     selected_file: Option<PathBuf>,
     pub roots: Vec<DirectoryNode>,
