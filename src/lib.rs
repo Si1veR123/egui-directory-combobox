@@ -32,9 +32,13 @@ impl DirectoryNode {
     }
 
     pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
-        Self::try_from_path(path).expect("Path should be a valid file or directory")
-    }
-
+       Self::try_from_path(path).unwrap_or_else(|| {
+           panic!(
+               "Path ({:?}) should be a valid file or directory",
+               path.as_ref()
+           )
+       })
+}   
     pub fn path(&self) -> &Path {
         match self {
             DirectoryNode::File(p) => p,
