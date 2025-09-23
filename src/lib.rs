@@ -11,8 +11,8 @@ pub enum DirectoryNode {
 
 impl DirectoryNode {
     pub fn try_from_path<P: AsRef<Path>>(path: P) -> Option<Self> {
-        std::fs::create_dir_all(&path).ok()?;
         let path = canonicalize(path.as_ref()).ok()?;
+        std::fs::create_dir_all(&path).ok()?;
         if path.is_dir() {
             let mut children = Vec::new();
             if let Ok(entries) = std::fs::read_dir(&path) {
@@ -34,7 +34,7 @@ impl DirectoryNode {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
        Self::try_from_path(&path).unwrap_or_else(|| {
            panic!(
-               "Path ({:?}) should be a valid file or directory",
+               "Failed to make DirectoryNode from path: {:?}",
                path.as_ref()
            )
        })
