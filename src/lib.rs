@@ -17,7 +17,7 @@ impl DirectoryNode {
             std::fs::create_dir_all(&path).ok()?;
         }
 
-        let path = canonicalize(path.as_ref()).ok()?;
+        let path = canonicalize(path).ok()?;
 
         if path.is_dir() {
             let mut children = Vec::new();
