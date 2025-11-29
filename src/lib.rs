@@ -341,6 +341,29 @@ impl DirectoryComboBox {
             }
         }
     }
+
+    pub fn get_all_paths(&self) -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+
+        fn collect_paths(node: &DirectoryNode, paths: &mut Vec<PathBuf>) {
+            match node {
+                DirectoryNode::File(p) => {
+                    paths.push(p.clone());
+                }
+                DirectoryNode::Directory(_, children) => {
+                    for child in children {
+                        collect_paths(child, paths);
+                    }
+                }
+            }
+        }
+
+        for root in &self.roots {
+            collect_paths(root, &mut paths);
+        }
+
+        paths
+    }
 }
 
 fn nested_combobox_ui(
