@@ -345,21 +345,23 @@ impl DirectoryComboBox {
     pub fn get_all_paths(&self) -> Vec<PathBuf> {
         let mut paths = Vec::new();
 
-        fn collect_paths(node: &DirectoryNode, paths: &mut Vec<PathBuf>) {
+        fn collect_paths(node: &DirectoryNode, paths: &mut Vec<PathBuf>, filter: Option<&Arc<dyn Fn(&Path) -> bool>>) {
             match node {
                 DirectoryNode::File(p) => {
-                    paths.push(p.clone());
+                    if filter.as_ref().map_or(true, |f| f(p)) {
+                        paths.push(p.clone());
+                    }
                 }
                 DirectoryNode::Directory(_, children) => {
                     for child in children {
-                        collect_paths(child, paths);
+                        collect_paths(child, paths, filter);
                     }
                 }
             }
         }
 
         for root in &self.roots {
-            collect_paths(root, &mut paths);
+            collect_paths(root, &mut paths, self.filter.as_ref());
         }
 
         paths
